@@ -2,8 +2,17 @@
 # Latihan 1
 
 ```{r}
-x = 1
-y = 2
-x + y
+#install.packages("forecast")
+#install.packages("tsibble")
+#install.packages("tseries")
+#install.packages("nortest")
+#install.packages("forecast")
+#install.packages("TTR")
+#install.packages("TSA")
+#install.packages("graphics")
+#install.packages("aTSA")
+#install.packages("lmtest")
+#install.packages("MLmestrics")
+#install.packages("car")
 ```
 
