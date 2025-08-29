@@ -1,0 +1,5 @@
+---
+title: "Latihan 2"
+output: html_document
+---
+
