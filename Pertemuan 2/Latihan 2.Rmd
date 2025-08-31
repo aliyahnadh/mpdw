@@ -3,3 +3,675 @@ title: "Latihan 2"
 output: html_document
 ---
 
+# Import Data
+```{r}
+df <- read.csv("~/Aliyah/SEMESTER 5/MPDW/data_aliyah (1).csv")
+df
+```
+
+```{r}
+library(dplyr)
+data <- df %>%
+  mutate(Date = as.Date(Date, format = "%m/%d/%Y")) %>%
+  select(Date, Close)
+
+data <- data[order(data$Date), ]
+
+data
+```
+
+
+```{r}
+data1.ts <- ts(data$Close)
+```
+
+
+```{r}
+ts.plot(data1.ts, xlab="Time Period ", ylab="Reading", 
+        main = "Time Series Plot")
+points(data1.ts)
+```
+
+# Single Moving Average dan Double Moving Average
+## Pembagian Data
+```{r}
+# hitung jumlah data
+n <- nrow(data)
+n_train <- floor(0.8 * n)
+
+# bagi data
+training_ma <- data[1:n_train, ]
+testing_ma  <- data[(n_train+1):n, ]
+
+# ubah ke time series
+train_ma.ts <- ts(training_ma$Close)
+test_ma.ts  <- ts(testing_ma$Close)
+```
+
+```{r}
+testing_ma
+```
+
+
+```{r}
+#eksplorasi keseluruhan data
+plot(data1.ts, col="black",main="Plot semua data")
+points(data1.ts)
+```
+
+```{r}
+#eksplorasi data latih
+plot(train_ma.ts, col="blue",main="Plot data latih")
+points(train_ma.ts)
+```
+
+```{r}
+#eksplorasi data uji
+plot(test_ma.ts, col="blue",main="Plot data uji")
+points(test_ma.ts)
+```
+
+```{r}
+library(ggplot2)
+ggplot() + 
+  geom_line(data = training_ma, aes(x = Date, y = Close, col = "Data Latih")) +
+  geom_line(data = testing_ma, aes(x = Date, y = Close, col = "Data Uji")) +
+  labs(x = "Periode Waktu", y = "Sales", color = "Legend") +
+   scale_colour_manual(name="Keterangan:", breaks = c("Data Latih", "Data Uji"),
+                      values = c("blue", "red")) + 
+  theme_bw() + theme(legend.position = "bottom",
+                     plot.caption = element_text(hjust=0.5, size=12))
+```
+
+# Single Moving Average
+```{r}
+library(rio)
+library(TSA)
+library(graphics)
+library(TTR)
+library(forecast)
+data.sma<-SMA(train_ma.ts, n=4)
+data.sma
+```
+
+```{r}
+data.ramal<-c(NA,data.sma)
+data.ramal #forecast 1 periode ke depan
+```
+
+```{r}
+data.gab<-cbind(
+  aktual=c(data1.ts),
+  pemulusan=c(data.sma,rep(NA,23)),
+  ramalan=c(data.ramal,rep(data.ramal[length(data.ramal)],22)))
+
+data.gab #forecast 24 periode ke depan
+```
+
+```{r}
+ts.plot(data1.ts, xlab="Time Period ", ylab="Sales", main= "SMA N=4 Data Sales")
+points(data1.ts)
+lines(data.gab[,2],col="green",lwd=2)
+lines(data.gab[,3],col="red",lwd=2)
+legend("topleft",c("data aktual","data pemulusan","data peramalan"), lty=8, col=c("black","green","red"), cex=0.5)
+```
+
+```{r}
+train_ma.ts
+```
+
+
+```{r}
+#Menghitung nilai keakuratan data latih
+error_train.sma = train_ma.ts-data.ramal[1:length(train_ma.ts)]
+
+SSE_train.sma = sum(error_train.sma[5:length(train_ma.ts)]^2)
+MSE_train.sma = mean(error_train.sma[5:length(train_ma.ts)]^2)
+MAPE_train.sma = mean(abs((error_train.sma[5:length(train_ma.ts)]/train_ma.ts[5:length(train_ma.ts)])*100))
+
+akurasi_train.sma <- matrix(c(SSE_train.sma, MSE_train.sma, MAPE_train.sma))
+row.names(akurasi_train.sma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_train.sma) <- c("Akurasi m = 4")
+akurasi_train.sma
+```
+Nilai MAPE data latih pada metode pemulusan SMA sekitar 5%, sehingga nilai ini dapat dikategorikan sebagai nilai akurasi yang sangat baik.
+
+```{r}
+#Menghitung nilai keakuratan data uji
+error_test.sma = test_ma.ts-data.gab[89:111,3]
+
+SSE_test.sma = sum(error_test.sma^2)
+MSE_test.sma = mean(error_test.sma^2)
+MAPE_test.sma = mean(abs((error_test.sma/test_ma.ts*100)))
+
+akurasi_test.sma <- matrix(c(SSE_test.sma, MSE_test.sma, MAPE_test.sma))
+row.names(akurasi_test.sma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_test.sma) <- c("Akurasi m = 4")
+akurasi_test.sma
+```
+Nilai MAPE data latih pada metode pemulusan SMA sekitar 30%, sehingga nilai ini dapat dikategorikan sebagai nilai akurasi yang kurang baik (lebih dari 10%).
+
+# Double Moving Average
+```{r}
+dma <- SMA(data.sma, n = 4)
+At <- 2*data.sma - dma
+Bt <- 2/(4-1)*(data.sma - dma)
+data.dma<- At+Bt
+data.ramal2<- c(NA, data.dma)
+
+t = 1:23
+f = c()
+
+for (i in t) {
+  f[i] = At[length(At)] + Bt[length(Bt)]*(i)
+}
+
+data.gab2 <- cbind(aktual = c(data1.ts), 
+                   pemulusan1 = c(data.sma,rep(NA,23)),
+                   pemulusan2 = c(dma, rep(NA,23)),
+                   At = c(At, rep(NA,23)), 
+                   Bt = c(Bt,rep(NA,23)),
+                   ramalan = c(data.ramal2, f[-1]))
+data.gab2
+```
+
+```{r}
+ts.plot(data1.ts, xlab="Time Period ", ylab="Sales", main= "DMA N=4 Data Sales")
+points(data1.ts)
+lines(data.gab2[,3],col="green",lwd=2)
+lines(data.gab2[,6],col="red",lwd=2)
+legend("topleft",c("data aktual","data pemulusan","data peramalan"), lty=8, col=c("black","green","red"), cex=0.8)
+```
+
+```{r}
+#Menghitung nilai keakuratan data latih
+error_train.dma = train_ma.ts-data.ramal2[1:length(train_ma.ts)]
+
+SSE_train.dma = sum(error_train.dma[8:length(train_ma.ts)]^2)
+MSE_train.dma = mean(error_train.dma[8:length(train_ma.ts)]^2)
+MAPE_train.dma = mean(abs((error_train.dma[8:length(train_ma.ts)]/train_ma.ts[8:length(train_ma.ts)])*100))
+
+akurasi_train.dma <- matrix(c(SSE_train.dma, MSE_train.dma, MAPE_train.dma))
+row.names(akurasi_train.dma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_train.dma) <- c("Akurasi m = 4")
+akurasi_train.dma
+```
+
+Nilai MAPE pada data latih menunjukkan hasil 4% (kurang dari 10%), sehingga dikategorikan sangat baik.
+
+```{r}
+#Menghitung nilai keakuratan data uji
+error_test.dma = test_ma.ts-data.gab2[89:111,6]
+SSE_test.dma = sum(error_test.dma^2)
+MSE_test.dma = mean(error_test.dma^2)
+MAPE_test.dma = mean(abs((error_test.dma/test_ma.ts*100)))
+
+akurasi_test.dma <- matrix(c(SSE_test.dma, MSE_test.dma, MAPE_test.dma))
+row.names(akurasi_test.dma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_test.dma) <- c("Akurasi m = 4")
+akurasi_test.dma
+```
+Nilai MAPE pada data latih menunjukkan hasil 50% (lebih dari 10%), sehingga dikategorikan kurang baik.
+
+# Perbandingan SMA dan DMA
+Dari hasil perhitungan nilai akurasi, didapatkan bahwa metode SMA memberikan angka MAPE yang lebih rendah dibandingkan dengan DMA. Maka dari itu, SMA merupakan metode yang lebih baik dibandingkan DMA.
+
+# Single Exponential Smoothing dan Double Exponential Smoothing
+```{r}
+# jumlah baris data
+n <- nrow(data)
+
+# hitung batas 80%
+n_train <- floor(0.8 * n)
+
+# bagi data
+training <- data[1:n_train, ]
+testing  <- data[(n_train+1):n, ]
+
+# ubah ke time series
+train.ts <- ts(training$Close)
+test.ts  <- ts(testing$Close)
+```
+
+```{r}
+#eksplorasi data
+plot(data1.ts, col="black",main="Plot semua data")
+points(data1.ts)
+```
+
+```{r}
+plot(train.ts, col="red",main="Plot data latih")
+points(train.ts)
+```
+
+
+```{r}
+plot(test.ts, col="blue",main="Plot data uji")
+points(test.ts)
+```
+
+
+```{r}
+#Eksplorasi dengan GGPLOT
+library(ggplot2)
+ggplot() + 
+  geom_line(data = training, aes(x = Date, y = Close, col = "Data Latih")) +
+  geom_line(data = testing, aes(x = Date, y = Close, col = "Data Uji")) +
+  labs(x = "Periode Waktu", y = "Membaca", color = "Legend") +
+  scale_colour_manual(name="Keterangan:", breaks = c("Data Latih", "Data Uji"),
+                      values = c("blue", "red")) + 
+  theme_bw() + theme(legend.position = "bottom",
+                     plot.caption = element_text(hjust=0.5, size=12))
+```
+
+# Single Exponential Smoothing
+```{r}
+#Cara 1 (fungsi ses)
+ses.1 <- ses(train.ts, h = 10, alpha = 0.2)
+plot(ses.1)
+```
+
+
+```{r}
+ses.1
+```
+
+
+```{r}
+ses.2<- ses(train.ts, h = 10, alpha = 0.7)
+plot(ses.2)
+```
+
+
+```{r}
+ses.2
+```
+
+```{r}
+autoplot(ses.1) +
+  autolayer(fitted(ses.1), series="Fitted") +
+  ylab("Membaca") + xlab("Periode")
+```
+
+
+```{r}
+#Cara 2 (fungsi Holtwinter)
+ses1<- HoltWinters(train.ts, gamma = FALSE, beta = FALSE, alpha = 0.2)
+plot(ses1)
+```
+
+```{r}
+#ramalan
+ramalan1<- forecast(ses1, h=23)
+ramalan1
+```
+
+
+```{r}
+ses2<- HoltWinters(train.ts, gamma = FALSE, beta = FALSE, alpha = 0.7)
+plot(ses2)
+```
+
+
+```{r}
+#ramalan
+ramalan2<- forecast(ses2, h=23)
+ramalan2
+```
+
+```{r}
+#SES
+ses.opt <- ses(train.ts, h = 23, alpha = NULL)
+plot(ses.opt)
+```
+
+
+```{r}
+ses.opt
+```
+
+
+```{r}
+#Lamda Optimum Holt Winter
+HWopt<- HoltWinters(train.ts, gamma = FALSE, beta = FALSE,alpha = NULL)
+HWopt
+```
+
+```{r}
+plot(HWopt)
+```
+
+```{r}
+#ramalan
+ramalanopt<- forecast(HWopt, h=23)
+ramalanopt
+```
+
+## Akurasi Data Latih
+```{r}
+#Keakuratan Metode
+#Pada data training
+
+# SES dengan alpha = 0.2
+SSE1<-ses1$SSE
+MSE1<-ses1$SSE/length(train.ts)
+RMSE1<-sqrt(MSE1)
+
+akurasi1 <- matrix(c(SSE1,MSE1,RMSE1))
+row.names(akurasi1)<- c("SSE", "MSE", "RMSE")
+colnames(akurasi1) <- c("Akurasi lamda=0.2")
+akurasi1
+```
+
+```{r}
+# SES dengan alpha = 0.7
+SSE2<-ses2$SSE
+MSE2<-ses2$SSE/length(train.ts)
+RMSE2<-sqrt(MSE2)
+
+akurasi2 <- matrix(c(SSE2,MSE2,RMSE2))
+row.names(akurasi2)<- c("SSE", "MSE", "RMSE")
+colnames(akurasi2) <- c("Akurasi lamda=0.7")
+akurasi2
+```
+
+
+```{r}
+SSE1<-ses1$SSE
+SSE1
+```
+
+
+```{r}
+#Cara Manual
+# Alpha = 0.2
+fitted1<-ramalan1$fitted
+sisaan1<-ramalan1$residuals
+head(sisaan1)
+```
+
+
+```{r}
+resid1<-training$Close-ramalan1$fitted
+head(resid1)
+```
+
+```{r}
+SSE.1=sum(sisaan1[2:length(train.ts)]^2)
+SSE.1
+```
+
+
+```{r}
+MSE.1 = SSE.1/length(train.ts)
+MSE.1
+```
+
+
+```{r}
+MAPE.1 = sum(abs(sisaan1[2:length(train.ts)]/train.ts[2:length(train.ts)])*
+               100)/length(train.ts)
+MAPE.1
+```
+
+
+```{r}
+akurasi.1 <- matrix(c(SSE.1,MSE.1,MAPE.1))
+row.names(akurasi.1)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi.1) <- c("Akurasi lamda=0.2")
+akurasi.1
+```
+
+
+```{r}
+# Alpha = 0.7
+fitted2<-ramalan2$fitted
+sisaan2<-ramalan2$residuals
+head(sisaan2)
+```
+
+
+```{r}
+resid2<-training$Close-ramalan2$fitted
+head(resid2)
+```
+
+
+```{r}
+SSE.2=sum(sisaan2[2:length(train.ts)]^2)
+SSE.2
+```
+
+
+```{r}
+MSE.2 = SSE.2/length(train.ts)
+MSE.2
+```
+
+
+```{r}
+MAPE.2 = sum(abs(sisaan2[2:length(train.ts)]/train.ts[2:length(train.ts)])*
+               100)/length(train.ts)
+MAPE.2
+```
+
+
+```{r}
+akurasi.2 <- matrix(c(SSE.2,MSE.2,MAPE.2))
+row.names(akurasi.2)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi.2) <- c("Akurasi lamda=0.7")
+akurasi.2
+```
+
+## Akurasi Data Uji
+```{r}
+# jumlah observasi uji
+n_test <- nrow(testing)
+
+# error (ramalan - aktual), samakan panjang dan tipe numeric
+e1   <- as.numeric(ramalan1$mean)[1:n_test] - as.numeric(testing$Close)
+e2   <- as.numeric(ramalan2$mean)[1:n_test] - as.numeric(testing$Close)
+eopt <- as.numeric(ramalanopt$mean)[1:n_test] - as.numeric(testing$Close)
+
+# SSE / MSE / RMSE untuk masing-masing model (abaikan NA)
+SSEtesting1  <- sum(e1^2,  na.rm = TRUE)
+MSEtesting1  <- mean(e1^2, na.rm = TRUE)
+RMSEtesting1 <- sqrt(MSEtesting1)
+
+SSEtesting2  <- sum(e2^2,  na.rm = TRUE)
+MSEtesting2  <- mean(e2^2, na.rm = TRUE)
+RMSEtesting2 <- sqrt(MSEtesting2)
+
+SSEtestingopt  <- sum(eopt^2,  na.rm = TRUE)
+MSEtestingopt  <- mean(eopt^2, na.rm = TRUE)
+RMSEtestingopt <- sqrt(MSEtestingopt)
+
+# Tabel ringkas
+akurasitesting_SSE <- matrix(c(SSEtesting1, SSEtesting2, SSEtestingopt),
+                             nrow = 3,
+                             dimnames = list(c("SSE1","SSE2","SSEopt"), "Nilai"))
+akurasitesting_MSE <- matrix(c(MSEtesting1, MSEtesting2, MSEtestingopt),
+                             nrow = 3,
+                             dimnames = list(c("MSE1","MSE2","MSEopt"), "Nilai"))
+akurasitesting_RMSE <- matrix(c(RMSEtesting1, RMSEtesting2, RMSEtestingopt),
+                              nrow = 3,
+                              dimnames = list(c("RMSE1","RMSE2","RMSEopt"), "Nilai"))
+
+akurasitesting_SSE
+```
+
+```{r}
+akurasitesting_MSE
+```
+
+
+```{r}
+akurasitesting_RMSE
+```
+```{r}
+ramalan1
+```
+
+```{r}
+testing
+```
+
+```{r}
+accuracy(ramalan1, testing$Close)
+```
+
+```{r}
+accuracy(ramalan2, testing$Close)
+```
+
+```{r}
+accuracy(ramalanopt, testing$Close)
+```
+
+# Double Exponential Smoothing
+```{r}
+#Lamda=0.2 dan gamma=0.2
+des.1<- HoltWinters(train.ts, gamma = FALSE, beta = 0.2, alpha = 0.2)
+plot(des.1)
+```
+
+
+```{r}
+#ramalan
+ramalandes1<- forecast(des.1, h=23)
+ramalandes1
+```
+
+```{r}
+#Lamda=0.6 dan gamma=0.3
+des.2<- HoltWinters(train.ts, gamma = FALSE, beta = 0.3, alpha = 0.6)
+plot(des.2)
+```
+
+
+```{r}
+#ramalan
+ramalandes2<- forecast(des.2, h=23)
+ramalandes2
+```
+
+
+```{r}
+plot(data1.ts)
+lines(des.1$fitted[,1], lty=2, col="blue")
+lines(ramalandes1$mean, col="red")
+```
+
+
+```{r}
+#Lamda dan gamma optimum
+des.opt<- HoltWinters(train.ts, gamma = FALSE)
+des.opt
+```
+
+
+```{r}
+plot(des.opt)
+```
+
+
+```{r}
+#ramalan
+ramalandesopt<- forecast(des.opt, h=23)
+ramalandesopt
+```
+
+## Akurasi Data Latih
+```{r}
+#Akurasi Data Training
+ssedes.train1<-des.1$SSE
+msedes.train1<-ssedes.train1/length(train.ts)
+sisaandes1<-ramalandes1$residuals
+head(sisaandes1)
+```
+
+```{r}
+mapedes.train1 <- sum(abs(sisaandes1[3:length(train.ts)]/train.ts[3:length(train.ts)])
+                      *100)/length(train.ts)
+
+akurasides.1 <- matrix(c(ssedes.train1,msedes.train1,mapedes.train1))
+row.names(akurasides.1)<- c("SSE", "MSE", "MAPE")
+colnames(akurasides.1) <- c("Akurasi lamda=0.2 dan gamma=0.2")
+akurasides.1
+```
+
+
+```{r}
+ssedes.train2<-des.2$SSE
+msedes.train2<-ssedes.train2/length(train.ts)
+sisaandes2<-ramalandes2$residuals
+head(sisaandes2)
+```
+
+
+```{r}
+mapedes.train2 <- sum(abs(sisaandes2[3:length(train.ts)]/train.ts[3:length(train.ts)])
+                      *100)/length(train.ts)
+
+akurasides.2 <- matrix(c(ssedes.train2,msedes.train2,mapedes.train2))
+row.names(akurasides.2)<- c("SSE", "MSE", "MAPE")
+colnames(akurasides.2) <- c("Akurasi lamda=0.6 dan gamma=0.3")
+akurasides.2
+```
+
+## Akurasi Data Uji
+```{r}
+#Akurasi Data Testing
+selisihdes1<-ramalandes1$mean-testing$Close
+selisihdes1
+```
+
+
+```{r}
+SSEtestingdes1<-sum(selisihdes1^2)
+MSEtestingdes1<-SSEtestingdes1/length(testing$Close)
+MAPEtestingdes1<-sum(abs(selisihdes1/testing$Close)*100)/length(testing$Close)
+
+selisihdes2<-ramalandes2$mean-testing$Close
+selisihdes2
+```
+
+
+```{r}
+SSEtestingdes2<-sum(selisihdes2^2)
+MSEtestingdes2<-SSEtestingdes2/length(testing$Close)
+MAPEtestingdes2<-sum(abs(selisihdes2/testing$Close)*100)/length(testing$Close)
+
+selisihdesopt<-ramalandesopt$mean-testing$Close
+selisihdesopt
+```
+
+```{r}
+SSEtestingdesopt<-sum(selisihdesopt^2)
+MSEtestingdesopt<-SSEtestingdesopt/length(testing$Close)
+MAPEtestingdesopt<-sum(abs(selisihdesopt/testing$Close)*100)/length(testing$Close)
+
+akurasitestingdes <-
+  matrix(c(SSEtestingdes1,MSEtestingdes1,MAPEtestingdes1,SSEtestingdes2,MSEtestingdes2,
+           MAPEtestingdes2,SSEtestingdesopt,MSEtestingdesopt,MAPEtestingdesopt),
+         nrow=3,ncol=3)
+row.names(akurasitestingdes)<- c("SSE", "MSE", "MAPE")
+colnames(akurasitestingdes) <- c("des ske1","des ske2","des opt")
+akurasitestingdes
+```
+
+# Perbandingan SES dan DES
+```{r}
+MSEfull <-
+  matrix(c(MSEtesting1,MSEtesting2,MSEtestingopt,MSEtestingdes1,MSEtestingdes2,
+           MSEtestingdesopt),nrow=3,ncol=2)
+row.names(MSEfull)<- c("ske 1", "ske 2", "ske opt")
+colnames(MSEfull) <- c("ses","des")
+MSEfull
+```
+
+Di antara SES dan DES, metode DES lebih baik dibandingkan SES karena nilai MSE pada DES lebih kecil dibandingkan dengan nilai MSE pada SES.
+
+
+
+
