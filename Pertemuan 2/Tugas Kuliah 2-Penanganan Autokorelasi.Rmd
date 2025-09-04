@@ -1,0 +1,135 @@
+---
+title: "Tugas Kuliah 2-Penanganan Autokorelasi"
+output: html_document
+---
+Nama : Aliyah Nadhratunnaim 
+NIM : G1401231087
+
+Data yang digunakan adalah data Indeks Pembangunan Manusia Provinsi Bengkulu tahun 2010-2024.
+
+# Import Data
+
+```{r}
+library(readxl)
+df <- read_excel("~/Aliyah/SEMESTER 5/MPDW/IPM BENGKULU.xlsx")
+df
+```
+
+# Model Regresi
+
+```{r}
+model <- lm(formula = IPM ~ Tahun, data = df)
+summary(model)
+```
+
+# Pengujian Autokorelasi
+
+```{r}
+library(lmtest)
+dwtest(model)
+```
+
+Hasil uji Durbin Watson menunjukkan bahwa model regresi tersebut melanggar asumsi autokorelasi. Hal ini ditunjukkan dengan nilai p-value berada di bawah 0,05.
+
+```{r}
+# Sisaan
+res <- residuals(model)
+
+# Plot residual vs order observasi
+plot(res, type = "o", main = "Residuals vs Order",
+     ylab = "Residuals", xlab = "Observation Order")
+```
+
+Plot sisaan vs order juga menunjukkan pola sehingga terdapat indikasi adanya autokorelasi pada model regresi.
+
+```{r}
+# Plot ACF
+acf(res, main = "ACF of Residuals")
+
+# Plot PACF
+pacf(res, main = "PACF of Residuals")
+```
+
+Selanjutnya, dilakukan penanganan autokorelasi pada model tersebut.
+
+# Penanganan Autokorelasi
+
+## Cochrane-orcutt
+
+```{r}
+library(orcutt)
+cochrane.orcutt(model)
+```
+
+Hasil dari penanganan autokorelasi dengan metode Cochrane Orcutt menghasilkan nilai p-value transformed sebesar 0,0489. Nilai tersebut masih berada di bawah batas signifikansi 0,05, sehingga autokorelasi belum sepenuhnya teratasi. Oleh karena itu, diperlukan penerapan metode lain untuk menangani permasalahan autokorelasi ini.
+
+## Hildreth-Lu
+
+```{r}
+# Hildreth-Lu (does not require iterations)
+rho = c(seq(0.1, 0.9, by = 0.1))
+
+hildreth.lu <- function(rho, model){
+  x <- model.matrix(model)[, -1]
+  y <- model.response(model.frame(model))
+  n <- length(y)
+  t <- 2:n
+  y <- y[t] - rho * y[t-1]
+  x <- x[t] - rho * x[t-1]
+
+  return(lm(y ~ x))
+}
+```
+
+```{r}
+# Ilustrasi penggunaan
+fit <- lm(IPM ~ Tahun, data = df)
+tab <- data.frame('rho' = rho,
+                  'SSE' = sapply(rho, function(r) deviance(hildreth.lu(r, fit))))
+
+round(tab, 4)
+```
+
+Hasil pencarian pada rentang rho 0,1 hingga 0,9 menunjukkan bahwa nilai SSE terkecil berada pada kisaran 0,7 hingga 0,8. Oleh karena itu, pencarian dilanjutkan dengan mempersempit nilai rho di sekitar rentang tersebut.
+
+```{r}
+plot(SSE ~ rho, data = tab, type = 'l')
+abline(v = tab[tab$SSE == min(tab$SSE), "rho"], lty = 3, col = "red")
+```
+
+Hasil plot juga menunjukkan bahwa nilai rho dengan SSE minimum terdapat pada rentang 0.7 hingga 0.8, sehingga pencarian dilanjutkan.
+
+```{r}
+rho = c(seq(0.7, 0.9, by = 0.01))
+tab <- data.frame('rho' = rho,
+                  'SSE' = sapply(rho, function(r) deviance(hildreth.lu(r, fit))))
+
+round(tab, 4)
+
+```
+
+Hasil pencarian pada rentang rho 0,7 hingga 0,8 menunjukkan bahwa nilai SSE terkecil berada pada kisaran 0,78 hingga 0,79. Oleh karena itu, pencarian dilanjutkan dengan mempersempit nilai rho di sekitar rentang tersebut.
+
+```{r}
+rho = c(seq(0.78, 0.79, by = 0.001))
+tab <- data.frame('rho' = rho,
+                  'SSE' = sapply(rho, function(r) deviance(hildreth.lu(r, fit))))
+
+round(tab, 4)
+```
+
+Terlihat bahwa nilai SSE sama yaitu 0,2991. Oleh karena itu, nilai rho = 0,785 dipilih untuk dilakukan pengujian lebih lanjut.
+
+```{r}
+fit <- hildreth.lu(0.785, fit)
+summary(fit)
+```
+
+```{r}
+dwtest(fit)
+```
+
+Hasil dari penanganan autokorelasi dengan metode Hildreth-Lu menghasilkan nilai p-value sebesar 0,04875. Nilai tersebut masih berada di bawah batas signifikansi 0,05, sehingga autokorelasi belum sepenuhnya teratasi. Oleh karena itu, diperlukan penerapan metode lain untuk menangani permasalahan autokorelasi ini.
+
+# Kesimpulan
+Metode Cochrane-Orcutt dan Hildreth-Lu belum sepenuhnya mampu mengatasi permasalahan autokorelasi pada data IPM Bengkulu periode 2010–2024. Oleh karena itu, diperlukan penerapan metode lain untuk menangani autokorelasi tersebut.
