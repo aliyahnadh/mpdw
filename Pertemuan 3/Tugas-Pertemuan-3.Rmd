@@ -1,9 +1,11 @@
 ---
 title: "Tugas-Pertemuan-3"
-output: html_document
-editor_options: 
-  markdown: 
-    wrap: 72
+author: "Aliyah Nadhratunnaim"
+format: 
+  html:
+    embed-resources: true
+    toc: true
+    self-contained: true
 ---
 
 Nama: Aliyah Nadhratunnaim
@@ -64,14 +66,11 @@ AIC(model.koyck)
 BIC(model.koyck)
 ```
 
-Dari hasil tersebut, didapatkan bahwa peubah $x_t$ dan $y_{t-1}$
-memiliki nilai p-value \< 0,05. Hal ini menunjukkan bahwa peubah $x_t$
-dan $y_{t-1}$ berpengaruh signifikan terhadap $y$.
+Dari hasil tersebut, didapatkan bahwa peubah $x_t$ dan $y_{t-1}$ memiliki nilai p-value \< 0,05. Hal ini menunjukkan bahwa peubah $x_t$ dan $y_{t-1}$ berpengaruh signifikan terhadap $y$.
 
 ## Peramalan dan Akurasi
 
-Berikut adalah hasil peramalan y untuk 5 periode kedepan menggunakan
-model koyck
+Berikut adalah hasil peramalan y untuk 5 periode kedepan menggunakan model koyck
 
 ```{r}
 fore.koyck <- forecast(model = model.koyck, x=test$o3, h=14)
@@ -104,8 +103,7 @@ AIC(model.dlm)
 BIC(model.dlm)
 ```
 
-Dari hasil di atas, didapat bahwa p-value dari $x_t$ \< 0,05. Hal ini
-menunjukkan bahwa $x_t$ berpengaruh signifikan terhadap $y$.
+Dari hasil di atas, didapat bahwa p-value dari $x_t$ \< 0,05. Hal ini menunjukkan bahwa $x_t$ berpengaruh signifikan terhadap $y$.
 
 ## Peramalan dan Akurasi
 
@@ -132,8 +130,7 @@ finiteDLMauto(formula = AQI ~ o3,
               model.type = "dlm", error.type = "AIC", trace = TRUE)
 ```
 
-Berdasarkan output tersebut, lag optimum didapatkan ketika lag=27.
-Selanjutnya dilakukan pemodelan untuk lag=27
+Berdasarkan output tersebut, lag optimum didapatkan ketika lag=27. Selanjutnya dilakukan pemodelan untuk lag=27
 
 ```{r}
 #model dlm dengan lag optimum
@@ -149,9 +146,7 @@ AIC(model.dlm2)
 BIC(model.dlm2)
 ```
 
-Dari hasil tersebut terdapat beberapa peubah yang berpengaruh signifikan
-terhadap taraf nyata 5% yaitu intercept,
-$x_t, x_{t-8}, x_{t-9}, x_{t-11}, x_{t-21}, x_{t-23}, x_{t-24}, x_{t-24}.$
+Dari hasil tersebut terdapat beberapa peubah yang berpengaruh signifikan terhadap taraf nyata 5% yaitu intercept, $x_t, x_{t-8}, x_{t-9}, x_{t-11}, x_{t-21}, x_{t-23}, x_{t-24}, x_{t-24}.$
 
 ```{r}
 #peramalan dan akurasi
@@ -167,8 +162,7 @@ mape.dlm2
 GoF(model.dlm2)
 ```
 
-Model tersebut merupakan model yang sangat baik dengan nilai MAPE yang
-kurang dari 10%.
+Model tersebut merupakan model yang sangat baik dengan nilai MAPE yang kurang dari 10%.
 
 # Model Autoregressive
 
@@ -199,10 +193,7 @@ AIC(model.ardl)
 BIC(model.ardl)
 ```
 
-Hasil estimasi menunjukkan bahwa selain peubah intersep, seluruh peubah
-dalam model memiliki nilai-p \< 0,05. Hal ini mengindikasikan bahwa
-peubah $x_t$, $x_{t-1}$, dan $y_{t-1}$ berpengaruh signifikan terhadap
-$y_t$.
+Hasil estimasi menunjukkan bahwa selain peubah intersep, seluruh peubah dalam model memiliki nilai-p \< 0,05. Hal ini mengindikasikan bahwa peubah $x_t$, $x_{t-1}$, dan $y_{t-1}$ berpengaruh signifikan terhadap $y_t$.
 
 ## Peramalan dan Akurasi
 
@@ -253,12 +244,6 @@ colnames(akurasi) <- c("MAPE")
 akurasi
 ```
 
-Dari tabel tersebut terlihat bahwa model **Autoregressive** memiliki
-nilai MAPE terkecil, yaitu **0,00779**, yang menunjukkan kemampuan
-prediksi paling akurat dibandingkan model lainnya. DLM 1 berada pada
-urutan kedua dengan MAPE sebesar 0,00855, diikuti oleh Koyck (0,0291),
-sedangkan DLM 2 memiliki kesalahan prediksi terbesar (0,20231).
+Dari tabel tersebut terlihat bahwa model **Autoregressive** memiliki nilai MAPE terkecil, yaitu **0,00779**, yang menunjukkan kemampuan prediksi paling akurat dibandingkan model lainnya. DLM 1 berada pada urutan kedua dengan MAPE sebesar 0,00855, diikuti oleh Koyck (0,0291), sedangkan DLM 2 memiliki kesalahan prediksi terbesar (0,20231).
 
-Berdasarkan temuan ini, **model Autoregressive** direkomendasikan
-sebagai model peramalan terbaik untuk digunakan dalam analisis dan
-prediksi selanjutnya.
+Berdasarkan temuan ini, **model Autoregressive** direkomendasikan sebagai model peramalan terbaik untuk digunakan dalam analisis dan prediksi selanjutnya.
