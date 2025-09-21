@@ -1,0 +1,187 @@
+---
+title: "Tugas-Pertemuan-4"
+output: html_document
+---
+
+```{r}
+set.seed(1087)
+wn <- rnorm(300)
+ts.plot(wn)
+```
+# Pembangkitan Proses MA(2)
+```{r}
+set.seed(1087)
+ma <- wn[1:2]
+```
+
+```{r}
+for(i in 3:300){
+   ma[i] <- wn[i] + 0.4 * wn[i - 1] + 0.6*wn[i-2]
+}
+ma
+```
+```{r}
+set.seed(1087)
+# Simulasi MA(2)
+ma2 <- arima.sim(list(order = c(0,0,2), ma = c(0.4, 0.6)), n = 300)
+ma2
+```
+
+
+```{r}
+acf(ma,lag.max = 20)
+```
+
+```{r}
+pacf(ma)
+```
+
+```{r}
+TSA::eacf(ma)
+```
+
+# Yt dengan Yt-1
+```{r}
+#Yt
+yt_ma <- ma[-1]
+yt_ma
+```
+
+
+```{r}
+#Yt-1
+yt_1_ma <- ma[-300]
+yt_1_ma
+```
+
+```{r}
+plot(y=yt_ma,x=yt_1_ma)
+```
+
+```{r}
+cor(yt_ma,yt_1_ma)
+```
+
+# Yt dengan Yt-2
+```{r}
+#Yt
+yt_ma2 <- ma[-c(1,2)]
+yt_ma2
+```
+
+```{r}
+#Yt-2
+yt_2_ma <- ma[-c(299,300)]
+yt_2_ma
+```
+
+```{r}
+plot(y=yt_ma2,x=yt_2_ma)
+```
+
+```{r}
+cor(yt_ma2,yt_2_ma)
+```
+
+# Yt dengan Yt-3
+```{r}
+#Yt
+yt_ma3 <- ma[-c(1,2,3)]
+yt_ma3
+```
+
+```{r}
+#Yt-3
+yt_3_ma <- ma[-c(298, 299,300)]
+yt_3_ma
+```
+
+```{r}
+plot(y=yt_ma3,x=yt_3_ma)
+```
+
+```{r}
+cor(yt_ma3,yt_3_ma)
+```
+
+# Proses AR
+
+```{r}
+set.seed(1087)
+n<-length(wn)
+n
+```
+
+```{r}
+ar2 <- numeric(n)    
+
+for (i in 3:n) {    
+  ar2[i] <- wn[i] + 0.5 * ar2[i-1] + 0.2 * ar2[i-2]
+}
+
+ar2
+```
+
+```{r}
+ar1 <- arima.sim(list(order=c(2,0,0), ar=c(0.5, 0.2)), n=300)
+ar1
+```
+
+```{r}
+ts.plot(ar2)
+```
+
+```{r}
+acf(ar2)
+```
+
+
+```{r}
+pacf(ar2)
+```
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
