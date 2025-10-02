@@ -196,8 +196,8 @@ Hasil uji Box–Cox menunjukkan bahwa nilai λ optimum adalah 1.708 dengan inter
 # Data digeser agar positif
 y_shift <- dt_rg_diff1 - min(dt_rg_diff1) + 1
 
-# Transformasi Box-Cox dengan lambda ~ 1.708
-y_bc <- y_shift^1.708
+# Transformasi Box-Cox dengan lambda ~ 2
+y_bc <- y_shift^2
 ```
 
 ```{r}
@@ -227,4 +227,4 @@ ci_upper <- max(ci_lambda)
 c(Batas_Bawah = ci_lower, Batas_Atas = ci_upper)
 ```
 
-Hasil uji Box–Cox menunjukkan bahwa nilai λ optimum adalah 1 dengan interval kepercayaan 95% sebesar (0.776–1.264). Karena selang tersebut memuat nilai λ = 1, maka dapat disimpulkan bahwa **data stasioner dalam ragam.**
+Hasil uji Box–Cox menunjukkan bahwa nilai λ optimum adalah 0.854 dengan interval kepercayaan 95% sebesar (0.662–1.080). Karena selang tersebut memuat nilai λ = 1, maka dapat disimpulkan bahwa **data stasioner dalam ragam.**
