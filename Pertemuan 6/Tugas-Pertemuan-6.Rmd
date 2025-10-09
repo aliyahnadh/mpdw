@@ -1,0 +1,446 @@
+---
+title: "Tugas-Pertemuan-6"
+author: "Aliyah Nadhratunnaim"
+date: "2025-10-02"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+# Import Data
+
+```{r}
+library(ggplot2)
+library(tsibble)
+library(tseries)
+library(MASS)
+library(forecast)
+set.seed(1087)
+```
+
+```{r}
+df <- read.csv("~/Aliyah/SEMESTER 5/MPDW/data_aliyah (1).csv")
+head(df)
+```
+
+```{r}
+df$Date <- as.Date(df$Date, format = "%m/%d/%Y")
+head(df)
+```
+
+```{r}
+library(dplyr)
+df <- df %>%
+  select(Date, Close)
+head(df)
+```
+
+## Pembagian data
+
+Data dibagi menjadi 90% data train dan 10% data latih
+
+```{r}
+# hitung jumlah data
+n <- nrow(df)
+n_train <- floor(0.9 * n)
+
+# bagi data
+training <- df[1:n_train, ]
+testing  <- df[(n_train+1):n, ]
+
+# ubah ke time series
+train <- ts(training$Close)
+test  <- ts(testing$Close)
+```
+
+```{r}
+n_train
+```
+
+```{r}
+nrow(testing)
+```
+
+
+# Uji Kestasioneran Data
+
+```{r}
+index <- seq(1:99)
+
+train |> as_tsibble() |> 
+  ggplot(aes(x = index, y = value)) +
+  geom_line() + theme_bw() +
+  xlab("Obs") + ylab("Nilai")
+```
+
+Berdasarkan plot time series tersebut, terlihat bahwa **data tidak stasioner dalam rataan** dan **tidak stasioner dalam ragam**, ditandai dengan adanya lebar pita pada plot yang cenderung berbeda.
+
+```{r}
+mean(train)
+```
+
+```{r}
+var(train)
+```
+
+## Plot ACF
+
+```{r}
+acf(train)
+```
+
+Plot ACF menunjukkan korelasi yang menurun secara perlahan pada banyak lag, sehingga menjadi **indikasi kuat bahwa deret tidak stasioner**.
+
+## Uji ADF
+
+```{r}
+tseries::adf.test(train)
+```
+
+Berdasarkan uji ADF tersebut, didapat p-value lebih besar dari taraf nyata 5% sehingga gagal tolak dan menandakan bahwa **data tidak stasioner dalam rataan**. Hal ini sesuai dengan hasil eksplorasi menggunakan plot time series dan plot ACF.
+
+## Uji Box-Cox
+
+```{r}
+# Uji Box-Cox
+bc <- boxcox(
+  train ~ index,
+  lambda = seq(-4.0, -0.5, by = 0.001)
+)
+```
+
+```{r}
+# Nilai lambda optimum
+lambda <- bc$x[which.max(bc$y)]
+lambda
+```
+
+```{r}
+# Selang kepercayaan 95% untuk lambda
+ci_lambda <- bc$x[bc$y > max(bc$y) - 0.5 * qchisq(0.95, 1)]
+
+# Batas bawah dan batas atas
+ci_lower <- min(ci_lambda)
+ci_upper <- max(ci_lambda)
+
+c(Batas_Bawah = ci_lower, Batas_Atas = ci_upper)
+```
+
+Hasil uji Box–Cox menunjukkan bahwa interval kepercayaan untuk nilai λ berada pada kisaran –3,267 hingga –0,685. Karena rentang tersebut tidak mencakup nilai λ = 1, maka terdapat indikasi bahwa data memiliki **ragam yang tidak homogen**.
+
+# Differencing
+
+Untuk mengatasi data yang tidak stasioner, dilakukan differencing sebanyak satu kali.
+
+```{r}
+# Differencing pertama pada postrend
+dt_rg_diff1 <- diff(train, differences = 1)
+```
+
+```{r}
+dt_rg_diff1 |> as_tsibble() |> 
+  ggplot(aes(x = index, y = value)) +
+  geom_line() + theme_bw() +
+  xlab("Obs") + ylab("Nilai")
+```
+
+## Plot ACF
+
+Selanjutnya dilakukan eksplorasi pada plot ACF dan uji ADF untuk memeriksa apakah data telah stasioner dalam rataan.
+
+```{r}
+acf(dt_rg_diff1)
+```
+
+Berdasarkan plot ACF, terlihat bahwa data cenderung stasioner dalam rataan ditandai dengan plot ACF yang *tails off* dan cenderung membentuk gelombang sinus
+
+## Uji ADF
+
+```{r}
+tseries::adf.test(dt_rg_diff1)
+```
+
+Berdasarkan uji ADF tersebut, didapat p-value lebih kecil dari taraf nyata 5% sehingga tolak $H_0$ dan menandakan bahwa **data stasioner dalam rataan**. Hal ini sesuai dengan hasil eksplorasi menggunakan plot time series dan plot ACF.
+
+## Uji Box-Cox
+
+```{r}
+index1 <- seq(1:98)
+
+# Uji Box-Cox
+bc <- boxcox(
+  dt_rg_diff1 - min(dt_rg_diff1) + 1 ~ index1,
+  lambda = seq(0, 5, by = 0.001)
+)
+```
+
+```{r}
+# Nilai lambda optimum (dibulatkan)
+lambda <- bc$x[which.max(bc$y)]
+lambda
+```
+
+```{r}
+# Selang kepercayaan 95% untuk lambda
+ci_lambda <- bc$x[bc$y > max(bc$y) - 0.5 * qchisq(0.95, 1)]
+
+# Batas bawah dan batas atas
+ci_lower <- min(ci_lambda)
+ci_upper <- max(ci_lambda)
+
+c(Batas_Bawah = ci_lower, Batas_Atas = ci_upper)
+```
+
+Hasil uji Box–Cox menunjukkan bahwa nilai λ optimum adalah 1.708 dengan interval kepercayaan 95% sebesar (1.323–2.160). Karena selang tersebut tidak memuat nilai λ = 1, maka dapat disimpulkan bahwa **data tidak stasioner dalam ragam sehingga diperlukan transformasi.**
+
+# Transformasi Box-Cox
+
+```{r}
+# Data digeser agar positif
+y_shift <- dt_rg_diff1 - min(dt_rg_diff1) + 1
+
+# Transformasi Box-Cox dengan lambda ~ 2
+y_bc <- y_shift^2
+```
+
+```{r}
+index <- seq(1:98)
+
+# Uji Box-Cox
+bc <- boxcox(
+  y_bc ~ index,
+  lambda = seq(-2, 5, by = 0.001)
+)
+```
+
+```{r}
+# Nilai lambda optimum (dibulatkan)
+lambda <- bc$x[which.max(bc$y)]
+lambda
+```
+
+```{r}
+# Selang kepercayaan 95% untuk lambda
+ci_lambda <- bc$x[bc$y > max(bc$y) - 0.5 * qchisq(0.95, 1)]
+
+# Batas bawah dan batas atas
+ci_lower <- min(ci_lambda)
+ci_upper <- max(ci_lambda)
+
+c(Batas_Bawah = ci_lower, Batas_Atas = ci_upper)
+```
+
+Hasil uji Box–Cox menunjukkan bahwa nilai λ optimum adalah 0.854 dengan interval kepercayaan 95% sebesar (0.662–1.080). Karena selang tersebut memuat nilai λ = 1, maka dapat disimpulkan bahwa **data stasioner dalam ragam.**
+
+# Pendugaan Parameter Model ARIMA
+```{r}
+#---SPESIFIKASI MODEL---#
+par(mfrow = c(1,2))
+acf(y_bc, main="ACF", lag.max=20)
+pacf(y_bc, main="PACF", lag.max=20)
+```
+
+```{r}
+library(TSA)
+eacf(y_bc) 
+```
+Dari plot eacf, kandidat model yang dapat diuji lebih lanjut meliputi: ARIMA(0,1,1), ARIMA(0,1,2), ARIMA(1,1,1), ARIMA(2,1,1), dan ARIMA(3,1,2).
+
+## ARIMA(0,1,1)
+```{r}
+model2=Arima(y_bc, order=c(0,0,1),method="ML")
+summary(model2)
+lmtest::coeftest(model2)
+```
+
+## ARIMA(0,1,2)
+```{r}
+model3=Arima(y_bc, order=c(0,0,2),method="ML")
+summary(model3)
+lmtest::coeftest(model3)
+```
+
+## ARIMA(1,1,1)
+```{r}
+model4=Arima(y_bc, order=c(1,0,1),method="ML")
+summary(model4)
+lmtest::coeftest(model4)
+```
+
+
+## ARIMA(2,1,1)
+```{r}
+model5=Arima(y_bc, order=c(2,0,1),method="ML")
+summary(model5)
+lmtest::coeftest(model5)
+```
+
+
+## ARIMA(3,1,2)
+```{r}
+model6=Arima(y_bc, order=c(3,0,2),method="ML")
+summary(model6)
+lmtest::coeftest(model6)
+```
+##Perbandingan Model
+```{r}
+hasil_model <- data.frame(
+  Model = c("ARIMA(0,1,1)",
+            "ARIMA(0,1,2)",
+            "ARIMA(1,1,1)",
+            "ARIMA(2,1,1)",
+            "ARIMA(3,1,2)"),
+  AIC = c(
+    AIC(model2),
+    AIC(model3),
+    AIC(model4),
+    AIC(model5),
+    AIC(model6)
+  ),
+  BIC = c(
+    BIC(model2),
+    BIC(model3),
+    BIC(model4),
+    BIC(model5),
+    BIC(model6)
+  )
+)
+
+hasil_model
+```
+
+Dari hasil perbandingan model, dapat kita lihat bahwa ARIMA(0,1,1) memberikan hasil AIC terkecil. Maka dari itu, dilakukan uji asumsi pada model ARIMA(0,1,1)
+
+# Uji Asumsi
+```{r}
+#Eksplorasi
+sisaan <- model2$residuals
+par(mfrow=c(2,2))
+
+#qqnorm(sisaan)
+#qqline(sisaan, col = "blue", lwd = 2)
+car::qqPlot(sisaan)
+plot(c(1:length(sisaan)),sisaan)
+
+# ACFF dan PACF sisaan
+acf(sisaan)
+pacf(sisaan)
+par(mfrow = c(2,2))
+```
+
+```{r}
+#1) Sisaan Menyebar Normal
+ks.test(sisaan,"pnorm") 
+```
+Terlihat bahwa sisaan tidak menyebar normal.
+
+```{r}
+#2) Sisaan saling bebas/tidak ada autokorelasi
+Box.test(sisaan, type = "Ljung") 
+```
+Terlihat bahwa sisaan tidak memiliki autokorelasi
+
+```{r}
+#3) Sisaan homogen
+Box.test((sisaan)^2, type = "Ljung") 
+```
+Terlihat bahwa sisaan homogen
+
+```{r}
+#4) Nilai tengah sisaan sama dengan nol
+t.test(sisaan, mu = 0, conf.level = 0.95) 
+```
+Terlihat bahwa nilai tengah sisaan sama dengan nol
+
+# Overfitting
+## ARIMA(0,1,2)
+```{r}
+library(forecast)
+#---PENDUGAAN PARAMETER MODEL---#
+model7=Arima(y_bc, order=c(0,0,2),method="ML")
+summary(model7)
+lmtest::coeftest(model7)
+```
+
+## ARIMA(1,1,1)
+```{r}
+#---PENDUGAAN PARAMETER MODEL---#
+model8=Arima(y_bc, order=c(1,0,1),method="ML")
+summary(model8)
+lmtest::coeftest(model8)
+```
+
+## Perbandingan Model
+```{r}
+hasil_model1 <- data.frame(
+  Model = c("ARIMA(0,1,1)",
+            "ARIMA(0,1,2)",
+            "ARIMA(1,1,1)"),
+  AIC = c(
+    AIC(model2),
+    AIC(model7),
+    AIC(model8)
+  ),
+  BIC = c(
+    BIC(model2),
+    BIC(model7),
+    BIC(model8)
+  )
+)
+
+hasil_model1
+```
+
+Didapatkan nilai AIC pada model ARIMA(0,1,1) lebih kecil dibandingkan hasil model overfitting lainnya, maka dari itu model ARIMA(0,1,1) digunakan untuk peramalan.
+
+# Peramalan
+```{r}
+#---FORECAST---#
+ramalan <- forecast::forecast(model2, h = 12) 
+ramalan
+```
+
+```{r}
+data.ramalan <- ramalan$mean
+plot(ramalan)
+```
+
+```{r}
+data.ramalan <- as.numeric(ramalan$mean)
+
+# Balik ke skala shift dulu (invers pangkat)
+data.ramalan_shift <- sqrt(data.ramalan)  # λ = 2 → akar 2
+
+# Balik ke skala asli
+data.ramalan_asli <- data.ramalan_shift + min(dt_rg_diff1) - 1
+
+```
+
+```{r}
+# Pastikan panjangnya sama dulu
+length(data.ramalan_asli)
+length(test)
+
+# Hitung MAPE
+mape <- mean(abs((test - data.ramalan_asli) / test)) * 100
+mape
+```
+
+Hasil evaluasi akurasi model menunjukkan bahwa nilai Mean Absolute Percentage Error (MAPE) sebesar **100,24%**. Nilai MAPE yang tinggi ini mengindikasikan bahwa hasil peramalan model ARIMA(0,1,1) masih memiliki tingkat kesalahan yang besar, di mana rata-rata penyimpangan antara nilai aktual dan hasil ramalan mencapai sekitar 100 persen dari nilai aktualnya. 
+
+Dengan demikian, model ARIMA(0,1,1) belum mampu merepresentasikan pola data dengan baik. Tingginya nilai MAPE dapat disebabkan oleh beberapa faktor, seperti adanya fluktuasi yang tinggi pada data, penggunaan parameter Box-Cox yang kurang optimal (λ = 2), atau pemilihan orde model yang belum sesuai. 
+
+Untuk meningkatkan performa model, dapat dilakukan penyesuaian parameter melalui fungsi `auto.arima()` atau mencoba model alternatif seperti ARIMA dengan orde berbeda, maupun model yang lebih kompleks seperti GARCH atau metode berbasis machine learning.
+
+
+
+
+
+
+
+
+
+
